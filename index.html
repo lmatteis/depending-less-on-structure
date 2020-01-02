@@ -91,7 +91,7 @@ if (endsWithDigitFive(x)) {
 <p>At this point the first module is requesting <code>bad</code> and the other is requesting <code>good</code>. Who will win? Because the first module is also blocking the <code>good</code> event, this makes the <code>bad</code> event win. Hence the program will output <code>bad</code>.</p>
 <p><img src="https://thepracticaldev.s3.amazonaws.com/i/gz9agb85gsga3dy7pi6j.png" alt="Alt Text"></p>
 <p>The semantics around how <code>request</code>, <code>waitFor</code> and <code>block</code> work are bit intricate and that&#39;s not the point of this article. For now we can think of them as a simple way to control whether other threads can continue their execution. </p>
-<p>Having modules control the execution of other modules without any direct contact point is the key insight to this approach.</p>
+<p>Having modules control the execution of other modules without direct communication is the key insight to this approach.</p>
 <h2 id="integrating-changes-is-where-complexity-lies">Integrating changes is where complexity lies</h2>
 <p>You might be asking: what’s the point of programming this way using these sync calls, and these request/waitFor/block events?</p>
 <p><strong>Intuitively we just introduced a change to a program, albeit a simple one, without having to do any integration work.</strong></p>
@@ -99,7 +99,7 @@ if (endsWithDigitFive(x)) {
 <p><img src="https://thepracticaldev.s3.amazonaws.com/i/sfew1gjdm96qntthrfho.png" alt="Alt Text"></p>
 <p>This is a huge deal.</p>
 <p>You might ask: but even with this new system we’ll eventually have to modify and refactor existing modules based on the new change.</p>
-<p>Indeed, but the change will be about enriching modules with semantics that allow them to collaborate better as a whole (such as waiting or blocking new events) rather than having to integrate or glue together parts of the modules to make them aware of how other modules work. Key difference is: <strong>there is no contact point between modules</strong>. They are always oblivious about each-other.</p>
+<p>Indeed, but the change will be about enriching modules with semantics that allow them to collaborate better as a whole (such as waiting or blocking new events) rather than having to integrate or glue together parts of the modules to make them aware of how other modules work. Key difference is: <strong>there is no direct communication between modules</strong>. They are always oblivious about each-other.</p>
 <h2 id="but-my-pure-functions-are-also-oblivious-of-each-other">But my pure functions are also oblivious of each-other</h2>
 <p>Pure functions are just input→output and in this context they are also written in a way that they are unaware of each-other.</p>
 <p>For instance let’s look at a simple data-transformation operation using <code>pipe</code>:</p>
@@ -111,11 +111,11 @@ if (endsWithDigitFive(x)) {
 )({ <span class="hljs-attribute">name</span>: <span class="hljs-string">'Buckethead'</span> })
 <span class="hljs-comment">// 'TEKCUB'</span>
 </code></pre>
-<p>The problem is that these functions still have a point of contact: the point where they’re used (aka the point of integration).</p>
+<p>The problem is that these functions still have a point of communication: the point where they’re used (aka the point of integration).</p>
 <p>The difference is subtle but in my opinion crucial to understanding why the problem of integration will continue haunting developers for years to come.</p>
 <p>Let’s make this a little more concrete and discuss a change to the flow above regarding “reversing the name before it gets the first 6 chars”. Obviously this is yet again a simply change. But what if we continue discussing the change where “the uppercase should only happen if the name is capitalized” and “reverse should only be done after successfully getting data from an API”.</p>
 <p>Things are getting a bit more hairy and complicated and yet only resemble a tiny and minimal version of the requirements that usually come up in real-world scenarios.</p>
-<p>By not having points of contact these requirements seem less intimidating to implement: for instance a new module could be swapped-in to pause execution of the reverse operation once the API successfully responds without modifying existing code.</p>
+<p>By not communicating directly these requirements seem less intimidating to implement: for instance a new module could be swapped-in to pause execution of the reverse operation once the API successfully responds without modifying existing code.</p>
 <h2 id="behavioral-programming">Behavioral Programming</h2>
 <p>This new method of executing programs is actually something that exists and is called <a href="http://www.wisdom.weizmann.ac.il/~bprogram/">Behavioral Programming</a>.</p>
 <p>We can enhance or refine a system by simply adding modules, similarly to how one can enhance a requirements document by adding clarifications, refinements and exceptions in the form of new sentences in the body of the document or as independent appendices and footnotes.</p>
