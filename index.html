@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+  prefix="
+    foaf: http://xmlns.com/foaf/0.1/
+    rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns#
+    rdfs: http://www.w3.org/2000/01/rdf-schema#
+    dc: http://purl.org/dc/elements/1.1/"
+>
+    <title>Luca Matteis</title>
+    <head>
+        <link rel="stylesheet" type="text/css" href="font.css" />
+    </head>
+<body typeof="foaf:Person" about="http://lucaa.org/">
+<div id="wrap">
+  <h1 id="depending-less-on-structure">Depending Less on Structure</h1>
+  <p class="section none">
+    <a href="https://twitter.com/lmatteis">Luca Matteis</a>, Dec 10 '19
+  </p>
+  <hr />
+  
+<p>Most of software development best-practices, architectures and patterns of the last few decades are essentially intricate ways of creating <strong>structures</strong> that allow humans to more easily understand and change what the software does.</p>
+<p>Building software works similarly to constructing buildings: we carefully have to put pieces together in a sort of lego fashion.</p>
+<p>The analogy of a lego building suits quite well since whenever one needs to modify the central parts of a lego structure they need to carefully take it apart and make sure the new pieces fit well with their surroundings.</p>
+<p>The lego pieces are our modules, components, functions or objects that when plugged together in a specific way give rise to the actual intended behavior of our programs.</p>
+<p><img src="https://thepracticaldev.s3.amazonaws.com/i/i2gouypyvy7ggeyky87x.png" alt="Alt Text"></p>
+<p>I’d argue that the issue of changing software stems from a deeper and more fundamental way of how programming is done: mainly that <strong>software needs to adhere too rigorously to structure</strong>.</p>
+<p>Let’s take a look at a simple program that takes as input a number x and decides whether it is a multiple of 3:</p>
+<pre><code class="lang-js">const x = readInput();
+<span class="hljs-keyword">if</span> (isMultipleOfThree(x)) {
+  <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+} <span class="hljs-keyword">else</span> {
+  <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+}
+</code></pre>
+<p>Now let’s imagine that we want to change this program to “also check whether it ends with the digit 5”. To do this we can simply change our if statement to include this check:</p>
+<pre><code class="lang-diff">  const x = readInput();
+- <span class="hljs-keyword">if</span> (isMultipleOfThree(x)) {
++ <span class="hljs-keyword">if</span> (isMultipleOfThree(x) &amp;&amp; endsWithDigitFive(x)) {
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+  }
+</code></pre>
+<p>I think the very fact that we had to make this modification to integrate this change is key to understanding why legacy code is so hard to change.</p>
+<p>But this is crazy talk… how can we make changes to a program without doing what we just did? What kind of sorcery am I talking about?</p>
+<p>Let’s rewrite the program above using a sort of new “language” with different execution semantics. It looks like this:</p>
+<pre><code class="lang-js">const x = sync({ <span class="hljs-string">waitFor:</span> <span class="hljs-string">'input'</span> })
+<span class="hljs-keyword">if</span> (isMultipleOfThree(x)) {
+  sync({ <span class="hljs-string">request:</span> <span class="hljs-string">'good'</span>, <span class="hljs-string">waitFor:</span> <span class="hljs-string">'bad'</span> })
+} <span class="hljs-keyword">else</span> {
+  sync({ <span class="hljs-string">request:</span> <span class="hljs-string">'bad'</span>, <span class="hljs-string">block:</span> <span class="hljs-string">'good'</span> })
+}
+</code></pre>
+<p>Of particular importance are these <code>sync()</code> calls that allow a module to <em>peek</em> at other modules and control their execution. </p>
+<p>When we run this program and we feed an event such as <code>input(6)</code> we get this output:</p>
+<pre><code><span class="hljs-function"><span class="hljs-title">input</span><span class="hljs-params">(<span class="hljs-number">6</span>)</span></span>
+good
+</code></pre><p>and if we feed it a number that isn’t multiple of 3 we get:</p>
+<pre><code><span class="hljs-function"><span class="hljs-title">input</span><span class="hljs-params">(<span class="hljs-number">7</span>)</span></span>
+bad
+</code></pre><p>Nothing surprising. Let’s try to implement the same change we did earlier to “also check whether it ends with the digit 5”. Instead of changing the code we just wrote, <strong>we’ll write a new module</strong> that looks like this:</p>
+<pre><code class="lang-js">const x = sync({ <span class="hljs-string">waitFor:</span> <span class="hljs-string">'input'</span> })
+<span class="hljs-keyword">if</span> (endsWithDigitFive(x)) {
+  sync({ <span class="hljs-string">request:</span> <span class="hljs-string">'good'</span>, <span class="hljs-string">waitFor:</span> <span class="hljs-string">'bad'</span> })
+} <span class="hljs-keyword">else</span> {
+  sync({ <span class="hljs-string">request:</span> <span class="hljs-string">'bad'</span>, <span class="hljs-string">block:</span> <span class="hljs-string">'good'</span> })
+}
+</code></pre>
+<p>This new module <strong>will run in parallel</strong> with the other one. Both modules run symmetrically. They both wait for input events. Whenever the <code>sync</code> function is called the two modules peek at each-others declarations.</p>
+<p>For instance IF they both reach the second sync call:</p>
+<pre><code class="lang-js"><span class="hljs-keyword">if</span> (isMultipleOfThree(x)) {
+  sync({ <span class="hljs-string">request:</span> <span class="hljs-string">'good'</span>, <span class="hljs-string">waitFor:</span> <span class="hljs-string">'bad'</span> })
+...
+<span class="hljs-keyword">if</span> (endsWithDigitFive(x)) {
+  sync({ <span class="hljs-string">request:</span> <span class="hljs-string">'good'</span>, <span class="hljs-string">waitFor:</span> <span class="hljs-string">'bad'</span> })
+</code></pre>
+<p>They are both requesting the <code>good</code> event hence that’s what the program will output.</p>
+<p>IF one of them is in another state such when the number ISN’T a multiple of 3 and it ends with 5, they’ll find each-other at this sync point:</p>
+<pre><code class="lang-js"><span class="hljs-selector-tag">if</span> (isMultipleOfThree(x)) {
+  <span class="hljs-selector-tag">sync</span>({ <span class="hljs-attribute">request</span>: <span class="hljs-string">'good'</span>, <span class="hljs-attribute">waitFor</span>: <span class="hljs-string">'bad'</span> })
+} else {
+  <span class="hljs-selector-tag">sync</span>({ <span class="hljs-attribute">request</span>: <span class="hljs-string">'bad'</span>, <span class="hljs-attribute">block</span>: <span class="hljs-string">'good'</span> }) <span class="hljs-comment">// &lt;-- at this state</span>
+}
+...
+if (endsWithDigitFive(x)) {
+  <span class="hljs-selector-tag">sync</span>({ <span class="hljs-attribute">request</span>: <span class="hljs-string">'good'</span>, <span class="hljs-attribute">waitFor</span>: <span class="hljs-string">'bad'</span> }) <span class="hljs-comment">// &lt;-- at this state</span>
+} else {
+  <span class="hljs-selector-tag">sync</span>({ <span class="hljs-attribute">request</span>: <span class="hljs-string">'bad'</span>, <span class="hljs-attribute">block</span>: <span class="hljs-string">'good'</span> })
+}
+</code></pre>
+<p>At this point the first module is requesting <code>bad</code> and the other is requesting <code>good</code>. Who will win? Because the first module is also blocking the <code>good</code> event, this makes the <code>bad</code> event win. Hence the program will output <code>bad</code>.</p>
+<p><img src="https://thepracticaldev.s3.amazonaws.com/i/gz9agb85gsga3dy7pi6j.png" alt="Alt Text"></p>
+<p>The semantics around how <code>request</code>, <code>waitFor</code> and <code>block</code> work are bit intricate and that&#39;s not the point of this article. For now we can think of them as a simple way to control whether other threads can continue their execution. </p>
+<p>Having modules control the execution of other modules without any direct contact point is the key insight to this approach.</p>
+<h2 id="integrating-changes-is-where-complexity-lies">Integrating changes is where complexity lies</h2>
+<p>You might be asking: what’s the point of programming this way using these sync calls, and these request/waitFor/block events?</p>
+<p><strong>Intuitively we just introduced a change to a program, albeit a simple one, without having to do any integration work.</strong></p>
+<p>Whereas before we had to write integration logic such as <code>&amp;&amp; endsWithDigitFive(x)</code> in order for our change to work, in this new system we simply had to create a new module that did exactly what we intended. Both modules could be swapped out without them knowing of each-other and without having to do any integration work.</p>
+<p><img src="https://thepracticaldev.s3.amazonaws.com/i/sfew1gjdm96qntthrfho.png" alt="Alt Text"></p>
+<p>This is a huge deal.</p>
+<p>You might ask: but even with this new system we’ll eventually have to modify and refactor existing modules based on the new change.</p>
+<p>Indeed, but the change will be about enriching modules with semantics that allow them to collaborate better as a whole (such as waiting or blocking new events) rather than having to integrate or glue together parts of the modules to make them aware of how other modules work. Key difference is: <strong>there is no contact point between modules</strong>. They are always oblivious about each-other.</p>
+<h2 id="but-my-pure-functions-are-also-oblivious-of-each-other">But my pure functions are also oblivious of each-other</h2>
+<p>Pure functions are just input→output and in this context they are also written in a way that they are unaware of each-other.</p>
+<p>For instance let’s look at a simple data-transformation operation using <code>pipe</code>:</p>
+<pre><code class="lang-js"><span class="hljs-selector-tag">pipe</span>(
+  getName,
+  uppercase,
+  get6Characters,
+  reverse
+)({ <span class="hljs-attribute">name</span>: <span class="hljs-string">'Buckethead'</span> })
+<span class="hljs-comment">// 'TEKCUB'</span>
+</code></pre>
+<p>The problem is that these functions still have a point of contact: the point where they’re used (aka the point of integration).</p>
+<p>The difference is subtle but in my opinion crucial to understanding why the problem of integration will continue haunting developers for years to come.</p>
+<p>Let’s make this a little more concrete and discuss a change to the flow above regarding “reversing the name before it gets the first 6 chars”. Obviously this is yet again a simply change. But what if we continue discussing the change where “the uppercase should only happen if the name is capitalized” and “reverse should only be done after successfully getting data from an API”.</p>
+<p>Things are getting a bit more hairy and complicated and yet only resemble a tiny and minimal version of the requirements that usually come up in real-world scenarios.</p>
+<p>By not having points of contact these requirements seem less intimidating to implement: for instance a new module could be swapped-in to pause execution of the reverse operation once the API successfully responds without modifying existing code.</p>
+<h2 id="behavioral-programming">Behavioral Programming</h2>
+<p>This new method of executing programs is actually something that exists and is called <a href="http://www.wisdom.weizmann.ac.il/~bprogram/">Behavioral Programming</a>.</p>
+<p>We can enhance or refine a system by simply adding modules, similarly to how one can enhance a requirements document by adding clarifications, refinements and exceptions in the form of new sentences in the body of the document or as independent appendices and footnotes.</p>
+<p>As goals are refined and requirements added to a program, or when bugs appear, rather than enhancing and often complicating existing modules, we strive to add new modules that precisely address the difference, or the gap, between the goals and the what the existing system accomplishes.</p>
+<p>Modules can be thought of as books on a shelf that can be easily swapped out and back in, rather than lego pieces that might crumble or complicate existing structures.</p>
+<p><img src="https://thepracticaldev.s3.amazonaws.com/i/r0uu6vr9wkedudmwgwm4.png" alt="Alt Text"></p>
+<h2 id="changing-software-you-don-t-understand">Changing software you don’t understand</h2>
+<p>But how does all this help with the infamous question of changing legacy code?</p>
+<p>Intuitively a program written this way allows us to observe specific traces and swap-in and out modules to implement a change without having to deeply understand the structure of the program: because the changes don’t depend on the structure but on the combined behavior of the modules.</p>
+<p>For instance in a complex legacy program we might need to implement a requirement:</p>
+<pre><code>Given the user doesn<span class="hljs-comment">'t have a promo code</span>
+<span class="hljs-keyword">When</span> the user adds an item <span class="hljs-keyword">to</span> the shopping cart
+  <span class="hljs-keyword">And</span> <span class="hljs-keyword">is</span> the first Monday <span class="hljs-keyword">of</span> the month
+<span class="hljs-keyword">Then</span> they should <span class="hljs-keyword">not</span> be able <span class="hljs-keyword">to</span> add more than <span class="hljs-number">3</span> items <span class="hljs-keyword">to</span> the cart
+</code></pre><p>In the common integration-style way we’d have to alter and somewhat complicate the modules that are responsible for these changes.</p>
+<p>In this new Behavioral Programming style we can instead map these changes quite naturally to new modules that can be swapped into the program without touching or even seeing how the system works.</p>
+<p>Which brings us to a new point: programming this way is more aligned with requirements:</p>
+<pre><code class="lang-js">promoCode = <span class="hljs-keyword">sync</span>({ waitFor: <span class="hljs-string">'promoCode'</span> })
+<span class="hljs-keyword">if</span> (promoCode) <span class="hljs-keyword">return</span>;
+<span class="hljs-keyword">sync</span>({ waitFor: <span class="hljs-string">'itemAddedToCart'</span> })
+<span class="hljs-keyword">if</span> (isFirstMondayOfMonth()) {
+  <span class="hljs-keyword">sync</span>({ waitFor: <span class="hljs-string">'itemAddedToCart'</span> })
+  <span class="hljs-keyword">sync</span>({ waitFor: <span class="hljs-string">'itemAddedToCart'</span> })
+  <span class="hljs-comment">// only 3 items max!</span>
+  <span class="hljs-keyword">sync</span>({ block: <span class="hljs-string">'itemsAddedToCart'</span> })
+}
+</code></pre>
+<h2 id="multi-modality">Multi-Modality</h2>
+<p>In addition to the fact that these type of modules are loosely-coupled, as they depend less on the structure, they also allow us to describe the behavior of our software using three main modalities: things that <strong>may</strong> happen, things that <strong>must</strong> happen and more importantly things that <strong>must not</strong> happen. This is in contrast to most contemporary programming approaches, which are usually of a single modality (do this) often guarded by conditions, etc.</p>
+<p>Specifying what may happen will provide the system with options and possibilities for things to execute (<code>request</code>), and specifying what must be done (<code>request</code> with high priority) and what may not be done (<code>block</code>) will constrain these options.</p>
+<p>Imagine being able to specify what is not allowed to happen, using <code>block</code>, even before the logic that generates such behavior is written:</p>
+<pre><code class="lang-js"><span class="hljs-comment">// Prevent manual updates</span>
+<span class="hljs-function"><span class="hljs-title">sync</span><span class="hljs-params">({ block: <span class="hljs-string">'manualUpdate'</span> })</span></span>
+</code></pre>
+<p>In the code above we are preventing a user from manually doing updates. We can write this piece of code at any stage of the development process; even at the very beginning; even before the code that triggers <code>manualUpdate</code> is written.</p>
+<p>Again this is in contrast with conventional programming that depends on structure and hence doesn&#39;t allow us to specify undesired behavior <strong>before</strong> the logic that leads to such behavior is written. I urge the reader to stop and think about this for a second as it&#39;s a quite crucial difference:</p>
+<p>How would you write the logic for &quot;preventing manual updates&quot; using conventional programming? You&#39;d have to find where in the <em>structure</em> the <code>manualUpdate</code> event is triggered and conditionally trigger that event. Instead what we are doing in the earlier snippet is quite different: we are blocking the event <code>manualUpdate</code> from happening <strong>even before the logic that triggered it was written</strong>.</p>
+<p>Imagine the learning potential and creative power of a human who is allowed to freely experiment with a variety of behaviors, except those that are forbidden (e.g., the illegal, expensive, or risky ones), figuring out if and when any of allowed actions produces valuable results</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Obviously this does not mean that by programming this way we do not have to think about good software development practices. But I do believe it makes it easier and less daunting to make changes to complex systems: you can swap out and back in new modules based on the changes needed rather than having to modify crucial points of integration within the structure of the program.</p>
+<p>However I think that this approach comes with some cost. For instance <code>if (isMultipleOfThree(x) &amp;&amp; endsWithDigitFive(x))</code> is very easy to understand, but <code>isMultipleOfThree(x)</code> and <code>endsWithDigitFive(x)</code> in different modules is a lot harder. Personally I see this more as a trade-off: <strong>trading control flow for extensibility</strong>.</p>
+<p><img src="https://thepracticaldev.s3.amazonaws.com/i/ol1fmgzn27gtlrhbjp1f.png" alt="Alt Text"></p>
+<p>This quote from David Harel, one of the originator of this approach, really is a nice way of thinking about Behavioral Programming. I tried depicting the main differences using lines or &quot;threads&quot; of behavior that overlap, intersect, replace or extend other behaviors, rather than boxes with arrows that need to rigorously dictate the structure.</p>
+<p>One amazing read that really made me change my entire attitude towards software development is <a href="http://www.wisdom.weizmann.ac.il/~harel/papers/Runware.pdf">The quest for runware: on compositional, executable and intuitive models</a>. A whole lot of this article was inspired by this.</p>
+<p>A final insight that I&#39;d like to end with is the fact that no matter how intricate our solutions to software development are, we are still limited by the way our <strong>brain</strong> works, hence finding solutions that align to our way of thinking are probably going to be the most interesting approaches. From the runware article:</p>
+<blockquote>
+<p>There is apparently no modification of existing initial memories -- no
+insertions, no cut-and-paste -- only more and more experiences. Images seen, sentences heard, pain felt, are all amassed as new memories and connected to existing memories in more ways than we can imagine today. Some of these, of course, explain, refine, correct, reorganize, or completely replace things that were previously experienced (or seen or heard or read) in how they affect future behavior.</p>
+</blockquote>
+<p>If you’re interested in learning more on how to program this way using these modules (formally called b-threads) there is a lot of practical research on the subject, it&#39;s not just theoretical. Simply searching on google scholar for &quot;<a href="https://scholar.google.com/scholar?hl=en&amp;as_sdt=0%2C5&amp;q=harel+behavioral+programming&amp;btnG=">harel behavioral programming</a>&quot; will point you in a good direction.</p>
+
+
+</div>
+</body>
+</html>
